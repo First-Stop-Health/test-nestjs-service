@@ -8,6 +8,17 @@ A simple NestJS service for managing tasks with a mocked database layer.
 npm install
 ```
 
+## Github Actions
+The following needs set up for the Github actions flow to work in AWS:
+
+### Add an Environment for dev
+1. Add Environment Secret with AWS_ROLE_ARN
+2. Add Environment variables for the following: AWS_REGION, CLOUDWATCH_ALARM_NAME, CONTAINER_NAME, ECS_CLUSTER, ECS_SERVICE, ECS_TASK_DEFINITION, MIGRATION_TASK_DEFINITION
+
+### Add secrets and variables
+1. Add Repository secret for AWS_ROLE_ARN_ECR
+2. Add Repository variable for ECR_REPOSITORY
+
 ## Running the Application
 
 ```bash
