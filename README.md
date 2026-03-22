@@ -8,16 +8,76 @@ A simple NestJS service for managing tasks with a mocked database layer.
 npm install
 ```
 
-## Github Actions
-The following needs set up for the Github actions flow to work in AWS:
+## GitHub Actions
 
-### Add an Environment for dev
-1. Add Environment Secret with AWS_ROLE_ARN
-2. Add Environment variables for the following: AWS_REGION, CLOUDWATCH_ALARM_NAME, CONTAINER_NAME, ECS_CLUSTER, ECS_SERVICE, ECS_TASK_DEFINITION, MIGRATION_TASK_DEFINITION
+Two pipelines are defined in `.github/workflows/`:
 
-### Add secrets and variables
-1. Add Repository secret for AWS_ROLE_ARN_ECR
-2. Add Repository variable for ECR_REPOSITORY
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `ci.yml` | Pull request → `main` | Build & test gate. Must pass before a PR can be merged. |
+| `cd.yml` | Push to `main` (PR merged) | Build → publish to ECR → deploy to dev → staging → production. |
+
+The CD pipeline currently auto-deploys to **dev** only. The staging and production jobs exist in the workflow but are disabled (`if: false`) until those environments are ready.
+
+### Prerequisites
+
+The workflows authenticate to AWS using **OIDC** (no long-lived access keys). You must have an IAM OIDC identity provider configured for GitHub Actions in your AWS account before the secrets below will work.
+
+---
+
+### 1. Repository secrets and variables
+
+Go to **Settings → Secrets and variables → Actions** in your GitHub repository.
+
+**Secrets**
+
+| Name | Description |
+|---|---|
+| `AWS_ROLE_ARN_ECR` | ARN of the IAM role assumed to push images to ECR (e.g. `arn:aws:iam::123456789012:role/github-ecr-push`) |
+
+**Variables**
+
+| Name | Example | Description |
+|---|---|---|
+| `AWS_REGION` | `us-east-1` | AWS region where ECR lives |
+| `ECR_REPOSITORY` | `my-service` | ECR repository name (not the full URI) |
+
+---
+
+### 2. GitHub Environments
+
+Go to **Settings → Environments** and create an environment for each deployment target. Currently only `dev` is active; create `staging` and `production` when you are ready to enable those pipeline stages.
+
+For each environment, add the following secrets and variables.
+
+**Environment secret**
+
+| Name | Description |
+|---|---|
+| `AWS_ROLE_ARN` | ARN of the IAM role assumed via OIDC to deploy to this environment |
+
+**Environment variables**
+
+| Name | Example | Description |
+|---|---|---|
+| `AWS_REGION` | `us-east-1` | AWS region for this environment |
+| `ECS_CLUSTER` | `my-cluster` | ECS cluster name |
+| `ECS_SERVICE` | `my-service-dev` | ECS service name |
+| `ECS_TASK_DEFINITION` | `my-service-dev` | Task definition family name |
+| `CONTAINER_NAME` | `app` | Container name inside the task definition |
+| `CLOUDWATCH_ALARM_NAME` | `my-service-dev-5xx` | Alarm monitored during the 5-minute bake period after each deploy |
+| `SERVICE_URL` | `https://dev.example.com` | Base URL used for smoke and E2E tests |
+| `MIGRATION_TASK_DEFINITION` | `my-service-migrations-dev` | Task definition used to run DB migrations (required when `skip-migrations` is false) |
+| `MIGRATION_SUBNET` | `subnet-0abc1234` | Subnet ID for the migration Fargate task |
+| `MIGRATION_SECURITY_GROUP` | `sg-0abc1234` | Security group ID for the migration Fargate task |
+
+> **Note:** `MIGRATION_TASK_DEFINITION`, `MIGRATION_SUBNET`, and `MIGRATION_SECURITY_GROUP` are only used when the deploy workflow is called with `skip-migrations: false`. The current pipeline sets `skip-migrations: true` for all environments, so these can be left blank until a real database is wired up.
+
+---
+
+### 3. Production approval gate
+
+When you enable the `production` environment, configure **required reviewers** under **Settings → Environments → production → Environment protection rules**. The CD pipeline will pause before the production deploy job and wait for a reviewer to approve it in the GitHub Actions UI.
 
 ## Running the Application
 
